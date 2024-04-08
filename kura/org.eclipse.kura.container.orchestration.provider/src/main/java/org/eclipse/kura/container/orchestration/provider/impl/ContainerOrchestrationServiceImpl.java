@@ -385,8 +385,6 @@ public class ContainerOrchestrationServiceImpl implements ConfigurableComponent,
                 this.dockerClient.stopContainerCmd(id).exec();
             }
 
-            removeContainerInstanceDigest(id);
-
         } catch (Exception e) {
             logger.error("Could not stop container {}. Caused by {}", id, e);
             throw new KuraException(KuraErrorCode.OS_COMMAND_ERROR);
@@ -403,6 +401,9 @@ public class ContainerOrchestrationServiceImpl implements ConfigurableComponent,
             }
 
             this.frameworkManagedContainers.removeIf(c -> id.equals(c.id));
+
+            removeContainerInstanceDigest(id);
+
         } catch (Exception e) {
             logger.error("Could not remove container {}. Caused by {}", id, e);
             throw new KuraException(KuraErrorCode.OS_COMMAND_ERROR);
