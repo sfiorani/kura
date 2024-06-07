@@ -1,0 +1,6 @@
+{
+    "identity": {
+        "nm": "test"
+    }, 
+    "configurationComponents": ["AdditionalConfigurations", "AssignedPermissions", "PasswordConfiguration"]
+}

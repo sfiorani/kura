@@ -25,6 +25,7 @@ import java.util.Hashtable;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -105,6 +106,13 @@ public class IdentityV2EndpointsTest extends AbstractRequestHandlerTest {
 
     private static PasswordStrengthVerificationService passwordStrengthVerificationServiceMock = mock(
             PasswordStrengthVerificationService.class);
+
+    private static final String MISSING_IDENTITY_NAME_VALIDATE_REQUEST = new Scanner(
+            IdentityV1EndpointsTest.class.getResourceAsStream("/missingIdenitityNameValidateRequest.json"), "UTF-8")
+                    .useDelimiter("\\A").next();
+    private static final String MISSING_NAME_FIELD_VALIDATE_REQUEST = new Scanner(
+            IdentityV1EndpointsTest.class.getResourceAsStream("/missingNameFieldValidateRequest.json"), "UTF-8")
+                    .useDelimiter("\\A").next();
 
     private final Map<String, MockExtensionHolder> extensions = new HashMap<>();
 
@@ -282,6 +290,24 @@ public class IdentityV2EndpointsTest extends AbstractRequestHandlerTest {
                 gson.toJson(new IdentityConfigurationDTO(new IdentityDTO(this.testUsername))));
 
         thenRequestSucceeds();
+    }
+
+    @Test
+    public void shouldReturnErrorValidatingIdentityConfigurationWithoutNameValue() {
+        whenRequestIsPerformed(new MethodSpec(METHOD_SPEC_POST), "/identities/validate",
+                MISSING_IDENTITY_NAME_VALIDATE_REQUEST);
+
+        thenResponseCodeIs(400);
+        thenResponseBodyEqualsJson("{\"message\": \"`name` value can't be empty\"}");
+    }
+
+    @Test
+    public void shouldReturnErrorValidatingIdentityConfigurationWithWrongNameField() {
+        whenRequestIsPerformed(new MethodSpec(METHOD_SPEC_POST), "/identities/validate",
+                MISSING_NAME_FIELD_VALIDATE_REQUEST);
+
+        thenResponseCodeIs(400);
+        thenResponseBodyEqualsJson("{\"message\": \"Missing 'name' property\"}");
     }
 
     @BeforeClass

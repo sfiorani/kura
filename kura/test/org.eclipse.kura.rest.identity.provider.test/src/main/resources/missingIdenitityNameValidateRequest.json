@@ -1,0 +1,6 @@
+{
+    "identity": {
+        "name": ""
+    }, 
+    "configurationComponents": ["AdditionalConfigurations", "AssignedPermissions", "PasswordConfiguration"]
+}
