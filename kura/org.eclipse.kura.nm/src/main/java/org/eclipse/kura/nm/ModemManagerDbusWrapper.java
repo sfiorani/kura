@@ -40,18 +40,29 @@ public class ModemManagerDbusWrapper {
 
     private static final Logger logger = LoggerFactory.getLogger(ModemManagerDbusWrapper.class);
 
+    private static final String MM_BUS_PATH = "/org/freedesktop/ModemManager1";
     private static final String MM_BUS_NAME = "org.freedesktop.ModemManager1";
     private static final String MM_MODEM_NAME = "org.freedesktop.ModemManager1.Modem";
     private static final String MM_SIM_NAME = "org.freedesktop.ModemManager1.Sim";
     private static final String MM_LOCATION_BUS_NAME = "org.freedesktop.ModemManager1.Modem.Location";
     private static final String MM_MODEM_PROPERTY_STATE = "State";
+    private static final String MM_PROPERTY_VERSION = "Version";
 
     private final DBusConnection dbusConnection;
 
     private final Map<String, NMModemResetHandler> modemHandlers = new HashMap<>();
 
-    public ModemManagerDbusWrapper(DBusConnection dbusConnection) {
+    private final SemanticVersion mmVersion;
+
+    public ModemManagerDbusWrapper(DBusConnection dbusConnection) throws DBusException {
         this.dbusConnection = dbusConnection;
+        Properties mmProperties = this.dbusConnection.getRemoteObject(MM_BUS_NAME, MM_BUS_PATH, Properties.class);
+        String strVer = mmProperties.Get(MM_BUS_NAME, MM_PROPERTY_VERSION);
+        this.mmVersion = SemanticVersion.parse(strVer);
+    }
+
+    protected SemanticVersion getVersion() {
+        return this.mmVersion;
     }
 
     protected void setGPS(Optional<String> modemDevicePath, Optional<Boolean> enableGPS, Optional<String> gpsModeString)

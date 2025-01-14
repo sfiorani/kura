@@ -54,6 +54,7 @@ import org.freedesktop.dbus.exceptions.DBusException;
 import org.freedesktop.dbus.exceptions.DBusExecutionException;
 import org.freedesktop.dbus.interfaces.Properties;
 import org.freedesktop.dbus.types.Variant;
+import org.freedesktop.modemmanager1.Modem;
 import org.freedesktop.modemmanager1.modem.Location;
 import org.freedesktop.networkmanager.Device;
 import org.freedesktop.networkmanager.Settings;
@@ -111,6 +112,7 @@ public class NMDbusConnector {
         this.networkManager = new NetworkManagerDbusWrapper(this.dbusConnection);
         this.modemManager = new ModemManagerDbusWrapper(this.dbusConnection);
         this.wpaSupplicant = new WpaSupplicantDbusWrapper(this.dbusConnection);
+        testingCellInfo();
     }
 
     public static synchronized NMDbusConnector getInstance() throws DBusException {
@@ -729,5 +731,31 @@ public class NMDbusConnector {
         }
 
         return modemsPath;
+    }
+
+    private void testingCellInfo() {
+
+        if (this.modemManager.getVersion().isGreaterEqualThan("1.20")) {
+            List<String> modemsPath = getModemsPaths();
+            modemsPath.forEach(modemPath -> {
+                try {
+                    Modem modem = this.dbusConnection.getRemoteObject("org.freedesktop.ModemManager1", modemPath,
+                            Modem.class);
+                    List<Map<String, Variant<?>>> cellInfo = modem.GetCellInfo();
+
+                    cellInfo.forEach(map -> {
+                        map.forEach((key, variant) -> {
+                            logger.info("KEY: {} , VAR: {}\n\n", key, variant);
+                        });
+                    });
+
+                } catch (DBusException e) {
+                    logger.error("\n\nERROR IN MODEM CREATION\n\n");
+                }
+            });
+        } else {
+            logger.info("\n\nModemManager Version is lower than 1.20, no cellular info available\n\n");
+        }
+
     }
 }
