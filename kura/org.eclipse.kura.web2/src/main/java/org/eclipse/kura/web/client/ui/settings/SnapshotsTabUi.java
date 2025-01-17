@@ -33,10 +33,7 @@ import org.eclipse.kura.web.shared.service.GwtSnapshotServiceAsync;
 import org.gwtbootstrap3.client.ui.Alert;
 import org.gwtbootstrap3.client.ui.Button;
 import org.gwtbootstrap3.client.ui.Modal;
-import org.gwtbootstrap3.client.ui.ModalBody;
-import org.gwtbootstrap3.client.ui.ModalFooter;
 import org.gwtbootstrap3.client.ui.gwt.CellTable;
-import org.gwtbootstrap3.client.ui.html.Span;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.uibinder.client.UiBinder;
@@ -99,6 +96,9 @@ public class SnapshotsTabUi extends Composite implements Tab {
 
     @UiField
     SnapshotDownloadModal downloadModal;
+
+    @UiField
+    ExperimentalSnapshotRollbackModal testrollbackModal;
 
     @UiField
     CellTable<GwtSnapshot> snapshotsGrid = new CellTable<>();
@@ -296,56 +296,89 @@ public class SnapshotsTabUi extends Composite implements Tab {
         this.upload.addClickHandler(event -> uploadAndApply());
     }
 
-    private void rollback() {
-        final GwtSnapshot snapshot = this.selectionModel.getSelectedObject();
-        if (snapshot != null) {
-            final Modal rollbackModal = new Modal();
-            ModalBody rollbackModalBody = new ModalBody();
-            ModalFooter rollbackModalFooter = new ModalFooter();
-            rollbackModal.setTitle(MSGS.confirm());
-            rollbackModal.setClosable(true);
-            rollbackModalBody.add(new Span(MSGS.deviceSnapshotRollbackConfirm()));
-
-            rollbackModalFooter.add(new Button("Yes", event -> {
-                EntryClassUi.showWaitModal();
-                SnapshotsTabUi.this.gwtXSRFService.generateSecurityToken(new AsyncCallback<GwtXSRFToken>() {
+    private void testRollback(GwtXSRFToken token, Long sid) {
+        this.gwtSnapshotService.getSnapshotConfigurationFromSid(token, sid.longValue(),
+                new AsyncCallback<List<String>>() {
 
                     @Override
-                    public void onFailure(Throwable ex) {
-                        EntryClassUi.hideWaitModal();
-                        FailureHandler.handle(ex);
+                    public void onFailure(Throwable caught) {
+                        FailureHandler.handle(caught);
+
                     }
 
                     @Override
-                    public void onSuccess(GwtXSRFToken token) {
-                        SnapshotsTabUi.this.gwtSnapshotService.rollbackDeviceSnapshot(token, snapshot,
-                                new AsyncCallback<Void>() {
-
-                                    @Override
-                                    public void onFailure(Throwable ex) {
-                                        EntryClassUi.hideWaitModal();
-                                        FailureHandler.handle(ex);
-                                    }
-
-                                    @Override
-                                    public void onSuccess(Void result) {
-                                        Window.Location.reload();
-                                    }
-                                });
+                    public void onSuccess(List<String> result) {
+                        testrollbackModal.show(sid, result);
                     }
-
                 });
+    }
 
-                rollbackModal.hide();
-            }));
+    private void rollback() {
 
-            rollbackModalFooter.add(new Button("No", event -> rollbackModal.hide()));
+        final GwtSnapshot snapshot = this.selectionModel.getSelectedObject();
+        SnapshotsTabUi.this.gwtXSRFService.generateSecurityToken(new AsyncCallback<GwtXSRFToken>() {
 
-            rollbackModal.add(rollbackModalBody);
-            rollbackModal.add(rollbackModalFooter);
-            rollbackModal.show();
+            @Override
+            public void onFailure(Throwable ex) {
+                FailureHandler.handle(ex);
 
-        }
+            }
+
+            @Override
+            public void onSuccess(GwtXSRFToken result) {
+                testRollback(result, snapshot.getSnapshotId());
+            }
+
+        });
+
+        // if (snapshot != null) {
+        // final Modal rollbackModal = new Modal();
+        // ModalBody rollbackModalBody = new ModalBody();
+        // ModalFooter rollbackModalFooter = new ModalFooter();
+        // rollbackModal.setTitle(MSGS.confirm());
+        // rollbackModal.setClosable(true);
+        // rollbackModalBody.add(new Span(MSGS.deviceSnapshotRollbackConfirm()));
+        //
+        // rollbackModalFooter.add(new Button("Yes", event -> {
+        // EntryClassUi.showWaitModal();
+        // SnapshotsTabUi.this.gwtXSRFService.generateSecurityToken(new AsyncCallback<GwtXSRFToken>() {
+        //
+        // @Override
+        // public void onFailure(Throwable ex) {
+        // EntryClassUi.hideWaitModal();
+        // FailureHandler.handle(ex);
+        // }
+        //
+        // @Override
+        // public void onSuccess(GwtXSRFToken token) {
+        // SnapshotsTabUi.this.gwtSnapshotService.rollbackDeviceSnapshot(token, snapshot,
+        // new AsyncCallback<Void>() {
+        //
+        // @Override
+        // public void onFailure(Throwable ex) {
+        // EntryClassUi.hideWaitModal();
+        // FailureHandler.handle(ex);
+        // }
+        //
+        // @Override
+        // public void onSuccess(Void result) {
+        // Window.Location.reload();
+        // }
+        // });
+        // }
+        //
+        // });
+        //
+        // rollbackModal.hide();
+        // }));
+        //
+        // rollbackModalFooter.add(new Button("No", event -> rollbackModal.hide()));
+        //
+        // rollbackModal.add(rollbackModalBody);
+        // rollbackModal.add(rollbackModalFooter);
+        // rollbackModal.show();
+        //
+        // }
     }
 
     private void downloadSnapshot(GwtXSRFToken token) {
@@ -362,7 +395,7 @@ public class SnapshotsTabUi extends Composite implements Tab {
 
                     @Override
                     public void onSuccess(List<String> result) {
-                        downloadModal.show(result, snapshotId);
+                        downloadModal.show(snapshotId, result);
 
                     }
                 });

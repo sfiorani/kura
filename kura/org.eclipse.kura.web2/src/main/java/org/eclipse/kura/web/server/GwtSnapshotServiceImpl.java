@@ -55,13 +55,13 @@ public class GwtSnapshotServiceImpl extends OsgiRemoteServiceServlet implements 
     }
 
     @Override
-    public void rollbackDeviceSnapshot(GwtXSRFToken xsrfToken, GwtSnapshot snapshot) throws GwtKuraException {
+    public void rollbackDeviceSnapshot(GwtXSRFToken xsrfToken, long snapshotId) throws GwtKuraException {
         checkXSRFToken(xsrfToken);
 
         try {
             ServiceLocator locator = ServiceLocator.getInstance();
             ConfigurationService cs = locator.getService(ConfigurationService.class);
-            cs.rollback(snapshot.getSnapshotId());
+            cs.rollback(snapshotId);
 
             //
             // Add an additional delay after the configuration update

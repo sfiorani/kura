@@ -107,7 +107,7 @@ public class WiresSnapshotServlet extends AuditServlet {
     }
 
     @Override
-    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+    protected void doPost(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
 
         KuraRemoteServiceServlet.requirePermissions(request, Mode.ALL, new String[] { KuraPermission.WIRES_ADMIN });
@@ -149,7 +149,7 @@ public class WiresSnapshotServlet extends AuditServlet {
             });
 
             GwtServerUtil.writeSnapshot(response, result, "graph_snapshot_" + System.currentTimeMillis(),
-                    request.getParameter("format"));
+                    request.getParameter("downloadFormat"));
 
         } catch (Exception e) {
             logger.warn("Failed to download snapshot", e);
