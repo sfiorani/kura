@@ -44,7 +44,7 @@ public class SnapshotDownloadModal extends SnapshotSelectorModal {
     AsyncCallback<SubmitCompleteEvent> downloadCallback;
 
     @Override
-    protected void customiseModal(long snapshotId) {
+    protected void customiseModal() {
         clearClickHandlers();
         removeRequestParameters();
 
@@ -52,12 +52,10 @@ public class SnapshotDownloadModal extends SnapshotSelectorModal {
                 ButtonType.PRIMARY, e -> hideAndReset());
 
         this.jsonDownloadButton = new SnapshotSelectorActionButton(MSGS.downloadSnapshotJsonButton(),
-                FONT_AWESOME_STYLE_NAME, ButtonType.PRIMARY,
-                e -> onSnapshotDownloadButtonClick(snapshotId, JSON_DOWNLOAD_FORMAT));
+                FONT_AWESOME_STYLE_NAME, ButtonType.PRIMARY, e -> onSnapshotDownloadButtonClick(JSON_DOWNLOAD_FORMAT));
 
         this.xmlDownloadButton = new SnapshotSelectorActionButton(MSGS.downloadSnapshotXmlButton(),
-                FONT_AWESOME_STYLE_NAME, ButtonType.PRIMARY,
-                e -> onSnapshotDownloadButtonClick(snapshotId, XML_DOWNLOAD_FORMAT));
+                FONT_AWESOME_STYLE_NAME, ButtonType.PRIMARY, e -> onSnapshotDownloadButtonClick(XML_DOWNLOAD_FORMAT));
 
         addFooterButton(this.cancelButton);
         addFooterButton(this.jsonDownloadButton);
@@ -86,7 +84,7 @@ public class SnapshotDownloadModal extends SnapshotSelectorModal {
      * OnEvent methods
      */
 
-    private void onSnapshotDownloadButtonClick(Long snapshotId, String format) {
+    private void onSnapshotDownloadButtonClick(String format) {
 
         List<CheckBox> selectedPids = getSelectedPidsCheckboxes();
 
@@ -97,9 +95,9 @@ public class SnapshotDownloadModal extends SnapshotSelectorModal {
         } else {
 
             if (selectedPids.size() == this.pidPanel.getWidgetCount()) {
-                onDownloadEntireSnapshot(snapshotId, format);
+                onDownloadEntireSnapshot(format);
             } else {
-                onDownloadPartialSnapshot(snapshotId, format, selectedPidsToRequestParameter(selectedPids));
+                onDownloadPartialSnapshot(format, selectedPidsToRequestParameter(selectedPids));
             }
 
             hideAndReset();
@@ -110,17 +108,17 @@ public class SnapshotDownloadModal extends SnapshotSelectorModal {
      * Utils methods
      */
 
-    private void onDownloadEntireSnapshot(Long snapshotId, String format) {
+    private void onDownloadEntireSnapshot(String format) {
         pidsListField.setValue("");
         snapshotDownloadFormatField.setValue(format);
-        snapshotIdField.setValue(snapshotId.toString());
+        snapshotIdField.setValue(String.valueOf(getSelectedSnapshot().getSnapshotId()));
         submitRequest(Arrays.asList(pidsListField, snapshotDownloadFormatField, snapshotIdField));
     }
 
-    private void onDownloadPartialSnapshot(Long snapshotId, String format, String selectedPids) {
+    private void onDownloadPartialSnapshot(String format, String selectedPids) {
         pidsListField.setValue(selectedPids);
         snapshotDownloadFormatField.setValue(format);
-        snapshotIdField.setValue(snapshotId.toString());
+        snapshotIdField.setValue(String.valueOf(getSelectedSnapshot().getSnapshotId()));
         submitRequest(Arrays.asList(pidsListField, snapshotDownloadFormatField, snapshotIdField));
     }
 

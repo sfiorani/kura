@@ -1,6 +1,7 @@
 package org.eclipse.kura.web.client.ui.settings;
 
 import java.util.List;
+import java.util.logging.Logger;
 
 import org.eclipse.kura.web.client.ui.EntryClassUi;
 import org.eclipse.kura.web.client.util.FailureHandler;
@@ -21,6 +22,7 @@ import com.google.gwt.user.client.rpc.AsyncCallback;
 public class SnapshotRollbackModal extends SnapshotSelectorModal {
 
     private static final String FONT_AWESOME_STYLE_NAME = "fa";
+    private static final Logger logger = Logger.getLogger(SnapshotRollbackModal.class.getSimpleName());
 
     private final GwtSecurityTokenServiceAsync gwtXSRFService = GWT.create(GwtSecurityTokenService.class);
     private final GwtSnapshotServiceAsync gwtSnapshotService = GWT.create(GwtSnapshotService.class);
@@ -29,14 +31,16 @@ public class SnapshotRollbackModal extends SnapshotSelectorModal {
     SnapshotSelectorActionButton rollbackButton;
 
     @Override
-    protected void customiseModal(long snapshotId) {
+    protected void customiseModal() {
+
         clearClickHandlers();
 
         this.cancelButton = new SnapshotSelectorActionButton(MSGS.cancelButton(), FONT_AWESOME_STYLE_NAME,
                 ButtonType.PRIMARY, e -> hideAndReset());
 
         this.rollbackButton = new SnapshotSelectorActionButton(MSGS.rollback(), FONT_AWESOME_STYLE_NAME,
-                ButtonType.PRIMARY, e -> onRollbackConfirmation(snapshotId, getSelectedPidsList()));
+                ButtonType.PRIMARY,
+                e -> onRollbackConfirmation(getSelectedSnapshot(), getSelectedPidsList(), getAdvancedModeValue()));
 
         addFooterButton(this.cancelButton);
         addFooterButton(this.rollbackButton);
@@ -46,17 +50,17 @@ public class SnapshotRollbackModal extends SnapshotSelectorModal {
 
         setAdvancedModePanel(true);
 
-        setAdvancedModeHintText(MSGS.snapshotRollbackAdvancedModeHint());
+        setAdvancedModeDescriptionText(MSGS.snapshotRollbackAdvancedModeHint());
 
         setAdvancedModeClickHandler(this::onAdvancedModeClick);
-
     }
 
     /*
      * OnEvent Methods
      */
 
-    private void onRollbackConfirmation(long snapshotId, List<String> selectedPids) {
+    private void onRollbackConfirmation(GwtSnapshot snapshot, List<String> selectedPids, boolean isAdvancedRollback) {
+        selectedPids.forEach(logger::info);
         EntryClassUi.showWaitModal();
         this.gwtXSRFService.generateSecurityToken(new AsyncCallback<GwtXSRFToken>() {
 
@@ -69,31 +73,19 @@ public class SnapshotRollbackModal extends SnapshotSelectorModal {
 
             @Override
             public void onSuccess(GwtXSRFToken token) {
-                gwtSnapshotService.findDeviceSnapshotFromSid(token, snapshotId, new AsyncCallback<List<GwtSnapshot>>() {
 
-                    @Override
-                    public void onFailure(Throwable ex) {
-                        EntryClassUi.hideWaitModal();
-                        FailureHandler.handle(ex);
-
-                    }
-
-                    @Override
-                    public void onSuccess(List<GwtSnapshot> snapshot) {
-                        if (advancedModeCheckbox.getValue().booleanValue()) {
-                            snapshtoRollback(token, snapshot);
-                        } else {
-                            configurationRollback(token, snapshot, selectedPids);
-                        }
-                    }
-
-                });
+                if (isAdvancedRollback) {
+                    snapshtoRollback(snapshot, token);
+                } else {
+                    configurationRollback(snapshot, token, selectedPids);
+                }
             }
         });
         hideAndReset();
     }
 
     private void onAdvancedModeClick(ClickEvent clickHandler) {
+
         boolean currentAdvancedModeState = this.advancedModeCheckbox.getValue().booleanValue();
 
         this.pidPanel.forEach(widget -> {
@@ -103,20 +95,15 @@ public class SnapshotRollbackModal extends SnapshotSelectorModal {
         });
 
         setAnchorEnable(!this.advancedModeCheckbox.getValue().booleanValue());
-        setAdvancedModeHintVisibility(currentAdvancedModeState);
-
+        setAdvancedModeDescriptionVisibility(currentAdvancedModeState);
     }
 
     /*
      * Rollback utils
      */
 
-    private void configurationRollback(GwtXSRFToken token, List<GwtSnapshot> snapshot, List<String> selectedPids) {
-        if (!snapshot.isEmpty()) {
-            FailureHandler.showErrorMessage("SnapshotId not found");
-        }
-
-        gwtSnapshotService.configurationRollbackDeviceSnapshot(token, snapshot.get(0), selectedPids,
+    private void configurationRollback(GwtSnapshot snapshot, GwtXSRFToken token, List<String> selectedPids) {
+        gwtSnapshotService.configurationRollbackDeviceSnapshot(token, snapshot, selectedPids,
                 new AsyncCallback<Void>() {
 
                     @Override
@@ -132,12 +119,8 @@ public class SnapshotRollbackModal extends SnapshotSelectorModal {
                 });
     }
 
-    private void snapshtoRollback(GwtXSRFToken token, List<GwtSnapshot> snapshot) {
-        if (!snapshot.isEmpty()) {
-            FailureHandler.showErrorMessage("SnapshotId not found");
-        }
-
-        gwtSnapshotService.rollbackDeviceSnapshot(token, snapshot.get(0), new AsyncCallback<Void>() {
+    private void snapshtoRollback(GwtSnapshot snapshot, GwtXSRFToken token) {
+        gwtSnapshotService.rollbackDeviceSnapshot(token, snapshot, new AsyncCallback<Void>() {
 
             @Override
             public void onFailure(Throwable ex) {

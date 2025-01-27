@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 
 import org.eclipse.kura.web.client.messages.Messages;
 import org.eclipse.kura.web.client.util.request.RequestQueue;
+import org.eclipse.kura.web.shared.model.GwtSnapshot;
 import org.eclipse.kura.web.shared.service.GwtSecurityTokenService;
 import org.eclipse.kura.web.shared.service.GwtSecurityTokenServiceAsync;
 import org.gwtbootstrap3.client.ui.Anchor;
@@ -81,15 +82,17 @@ public abstract class SnapshotSelectorModal extends Composite {
     @UiField
     Label selectedPidCounter;
     @UiField
-    Paragraph advancedModeHint;
+    Paragraph advancedModeDescription;
     @UiField
-    Label advancedModeHintSeparator;
+    Label advancedModeDescriptionSeparator;
     @UiField
     ModalFooter snapshotFooter;
 
     HandlerRegistration anchorClickHandler;
     HandlerRegistration downloadHandler;
     HandlerRegistration advancedModeClickHandler;
+
+    GwtSnapshot selectedSnapshot;
 
     VerticalPanel pidPanel = new VerticalPanel();
 
@@ -99,21 +102,25 @@ public abstract class SnapshotSelectorModal extends Composite {
         initWidget(uiBinder.createAndBindUi(this));
         this.noPidSelectedError.setVisible(false);
         this.advancedModePanel.setVisible(false);
-        this.advancedModeHint.setVisible(false);
-        this.advancedModeHintSeparator.setVisible(false);
+        this.advancedModeDescription.setVisible(false);
+        this.advancedModeDescriptionSeparator.setVisible(false);
+
+        this.snapshotForm.add(this.requestXsrfToken);
     }
 
     /*
      * Use it to customise the modal using the target snapshot
      */
-    protected abstract void customiseModal(long snapshotId);
+    protected abstract void customiseModal();
 
     /*
      * Use it to show the modal
      */
 
-    public void showModal(long snapshotId, List<String> pidList) {
-        customiseModal(snapshotId);
+    public void showModal(GwtSnapshot snapshot, List<String> pidList) {
+        this.selectedSnapshot = snapshot;
+
+        customiseModal();
 
         initPidSearch();
         initSnapshotScrollPanel();
@@ -131,19 +138,23 @@ public abstract class SnapshotSelectorModal extends Composite {
     public void hideAndReset() {
         this.snapshotModal.hide();
 
+        this.selectedSnapshot = null;
+
         this.advancedModePanel.setVisible(false);
-        this.advancedModeHint.setVisible(false);
+        this.advancedModeDescription.setVisible(false);
 
         this.pidSelectionScrollPanel.setVerticalScrollPosition(0);
         this.pidSelectionScrollPanel.setHorizontalScrollPosition(0);
         this.noPidSelectedError.setVisible(false);
 
         this.advancedModeCheckbox.setValue(false);
-        this.advancedModeHint.setText("");
-        this.advancedModeHint.setVisible(false);
-        this.advancedModeHintSeparator.setVisible(false);
+        this.advancedModeDescription.setText("");
+        this.advancedModeDescription.setVisible(false);
+        this.advancedModeDescriptionSeparator.setVisible(false);
 
         this.selectOrRemoveAllAnchor.setEnabled(true);
+
+        this.requestXsrfToken.setValue("");
 
         this.snapshotFooter.clear();
     }
@@ -151,6 +162,10 @@ public abstract class SnapshotSelectorModal extends Composite {
     /*
      * Customising Helpers
      */
+
+    public GwtSnapshot getSelectedSnapshot() {
+        return this.selectedSnapshot;
+    }
 
     public void setFormType(String encodingType, String method, String action) {
         this.snapshotForm.setEncoding(encodingType);
@@ -180,17 +195,22 @@ public abstract class SnapshotSelectorModal extends Composite {
         this.advancedModePanel.setVisible(isVisible);
     }
 
-    public void setAdvancedModeHintText(String text) {
-        this.advancedModeHint.setText(text);
+    public void setAdvancedModeDescriptionText(String text) {
+        this.advancedModeDescription.setText(text);
     }
 
-    public void setAdvancedModeHintVisibility(boolean isVisible) {
-        this.advancedModeHint.setVisible(isVisible);
-        this.advancedModeHintSeparator.setVisible(isVisible);
+    public void setAdvancedModeDescriptionVisibility(boolean isVisible) {
+        this.advancedModeDescription.setVisible(isVisible);
+        this.advancedModeDescriptionSeparator.setVisible(isVisible);
+        updateSelectedPidsCounter();
     }
 
     public void setAdvancedModeClickHandler(ClickHandler clickHandler) {
         this.advancedModeClickHandler = this.advancedModeCheckbox.addClickHandler(clickHandler);
+    }
+
+    public boolean getAdvancedModeValue() {
+        return this.advancedModeCheckbox.getValue().booleanValue();
     }
 
     public void setAnchorEnable(boolean isEnabled) {
@@ -355,7 +375,7 @@ public abstract class SnapshotSelectorModal extends Composite {
         this.pidPanel.forEach(widget -> {
             CheckBox box = (CheckBox) widget;
             if (box.getValue().booleanValue()) {
-                selectedPidsList.add(box.getName());
+                selectedPidsList.add(box.getText());
             }
         });
 

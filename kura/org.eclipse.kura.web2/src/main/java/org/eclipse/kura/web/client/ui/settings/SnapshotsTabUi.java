@@ -368,9 +368,7 @@ public class SnapshotsTabUi extends Composite implements Tab {
     }
 
     private void downloadSnapshot(GwtXSRFToken token) {
-
-        Long snapshotId = this.selected.getSnapshotId();
-        this.gwtSnapshotService.getSnapshotConfigurationFromSid(token, snapshotId.longValue(),
+        this.gwtSnapshotService.getSnapshotConfigurationFromSid(token, this.selected.getSnapshotId(),
                 new AsyncCallback<List<String>>() {
 
                     @Override
@@ -381,15 +379,14 @@ public class SnapshotsTabUi extends Composite implements Tab {
 
                     @Override
                     public void onSuccess(List<String> pidList) {
-                        snapshotDownloadModal.showModal(snapshotId, pidList);
+                        snapshotDownloadModal.showModal(selected, pidList);
 
                     }
                 });
     }
 
     private void rollbackSnapshot(GwtXSRFToken token) {
-        Long snapshotId = this.selected.getSnapshotId();
-        this.gwtSnapshotService.getSnapshotConfigurationFromSid(token, snapshotId.longValue(),
+        this.gwtSnapshotService.getSnapshotConfigurationFromSid(token, this.selected.getSnapshotId(),
                 new AsyncCallback<List<String>>() {
 
                     @Override
@@ -400,7 +397,7 @@ public class SnapshotsTabUi extends Composite implements Tab {
 
                     @Override
                     public void onSuccess(List<String> pidList) {
-                        snapshotRollbackModal.showModal(snapshotId, pidList);
+                        snapshotRollbackModal.showModal(selected, pidList);
                     }
                 });
     }

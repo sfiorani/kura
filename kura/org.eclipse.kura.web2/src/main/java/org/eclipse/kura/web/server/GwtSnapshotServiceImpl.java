@@ -29,10 +29,13 @@ import org.eclipse.kura.web.shared.GwtKuraException;
 import org.eclipse.kura.web.shared.model.GwtSnapshot;
 import org.eclipse.kura.web.shared.model.GwtXSRFToken;
 import org.eclipse.kura.web.shared.service.GwtSnapshotService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class GwtSnapshotServiceImpl extends OsgiRemoteServiceServlet implements GwtSnapshotService {
 
     private static final long serialVersionUID = 8804372718146289179L;
+    private static final Logger logger = LoggerFactory.getLogger(GwtSnapshotServiceImpl.class);
 
     @Override
     public List<GwtSnapshot> findDeviceSnapshots(GwtXSRFToken xsrfToken) throws GwtKuraException {
@@ -81,6 +84,38 @@ public class GwtSnapshotServiceImpl extends OsgiRemoteServiceServlet implements 
     }
 
     @Override
+    public void configurationRollbackDeviceSnapshot(GwtXSRFToken xsrfToken, GwtSnapshot snapshot,
+            List<String> targetPids) throws GwtKuraException {
+
+        checkXSRFToken(xsrfToken);
+
+        try {
+
+            ServiceLocator locator = ServiceLocator.getInstance();
+            ConfigurationService cs = locator.getService(ConfigurationService.class);
+
+            List<ComponentConfiguration> targetConfigurations = cs.getSnapshot(snapshot.getSnapshotId()).stream()
+                    .filter(config -> targetPids.contains(config.getPid())).collect(Collectors.toList());
+
+            cs.updateConfigurations(targetConfigurations, true);
+
+            //
+            // Add an additional delay after the configuration update
+            // to give the time to the device to apply the received
+            // configuration
+            SystemService ss = locator.getService(SystemService.class);
+            long delay = Long.parseLong(ss.getProperties().getProperty("console.updateConfigDelay", "5000"));
+            if (delay > 0) {
+                Thread.sleep(delay);
+            }
+
+        } catch (Exception e) {
+            KuraExceptionHandler.handle(e);
+        }
+
+    }
+
+    @Override
     public List<String> getSnapshotConfigurationFromSid(GwtXSRFToken xsrfToken, long sid) throws GwtKuraException {
 
         checkXSRFToken(xsrfToken);
@@ -126,28 +161,5 @@ public class GwtSnapshotServiceImpl extends OsgiRemoteServiceServlet implements 
         }
 
         return Collections.emptyList();
-    }
-
-    @Override
-    public void configurationRollbackDeviceSnapshot(GwtXSRFToken xsrfToken, GwtSnapshot snapshot,
-            List<String> targetPids) throws GwtKuraException {
-
-        checkXSRFToken(xsrfToken);
-
-        try {
-
-            ServiceLocator locator = ServiceLocator.getInstance();
-            ConfigurationService cs = locator.getService(ConfigurationService.class);
-
-            List<ComponentConfiguration> snapshotConfigs = cs.getSnapshot(snapshot.getSnapshotId()).stream()
-                    .filter(componentConfig -> targetPids.contains(componentConfig.getPid()))
-                    .collect(Collectors.toList());
-
-            cs.updateConfigurations(snapshotConfigs);
-
-        } catch (Exception e) {
-            KuraExceptionHandler.handle(e);
-        }
-
     }
 }
