@@ -14,10 +14,13 @@
 package org.eclipse.kura.web.server;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
+import org.eclipse.kura.configuration.ComponentConfiguration;
 import org.eclipse.kura.configuration.ConfigurationService;
 import org.eclipse.kura.system.SystemService;
 import org.eclipse.kura.web.server.util.KuraExceptionHandler;
@@ -97,6 +100,54 @@ public class GwtSnapshotServiceImpl extends OsgiRemoteServiceServlet implements 
         }
 
         return configurationList;
+
+    }
+
+    @Override
+    public List<GwtSnapshot> findDeviceSnapshotFromSid(GwtXSRFToken xsrfToken, long sid) throws GwtKuraException {
+        checkXSRFToken(xsrfToken);
+
+        try {
+            ServiceLocator locator = ServiceLocator.getInstance();
+            ConfigurationService cs = locator.getService(ConfigurationService.class);
+            Set<Long> snapshotIds = cs.getSnapshots();
+            if (snapshotIds != null && !snapshotIds.isEmpty()) {
+                for (Long snapshotId : snapshotIds) {
+                    if (snapshotId.equals(sid)) {
+                        GwtSnapshot snapshot = new GwtSnapshot();
+                        snapshot.setCreatedOn(new Date(snapshotId));
+                        return Collections.singletonList(snapshot);
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            KuraExceptionHandler.handle(e);
+        }
+
+        return Collections.emptyList();
+    }
+
+    @Override
+    public void configurationRollbackDeviceSnapshot(GwtXSRFToken xsrfToken, GwtSnapshot snapshot,
+            List<String> targetPids) throws GwtKuraException {
+
+        checkXSRFToken(xsrfToken);
+
+        try {
+
+            ServiceLocator locator = ServiceLocator.getInstance();
+            ConfigurationService cs = locator.getService(ConfigurationService.class);
+
+            List<ComponentConfiguration> snapshotConfigs = cs.getSnapshot(snapshot.getSnapshotId()).stream()
+                    .filter(componentConfig -> targetPids.contains(componentConfig.getPid()))
+                    .collect(Collectors.toList());
+
+            cs.updateConfigurations(snapshotConfigs);
+
+        } catch (Exception e) {
+            KuraExceptionHandler.handle(e);
+        }
 
     }
 }

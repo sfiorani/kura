@@ -75,6 +75,7 @@
             </b:Modal>
             
             <settings:SnapshotDownloadModal ui:field="snapshotDownloadModal" />
+            <settings:SnapshotRollbackModal ui:field="snapshotRollbackModal" />
         </b:Column>
     </b:Container>
 </ui:UiBinder> 

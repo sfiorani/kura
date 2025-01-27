@@ -18,6 +18,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import org.eclipse.kura.web.client.messages.Messages;
+import org.eclipse.kura.web.client.util.request.RequestQueue;
+import org.eclipse.kura.web.shared.service.GwtSecurityTokenService;
+import org.eclipse.kura.web.shared.service.GwtSecurityTokenServiceAsync;
 import org.gwtbootstrap3.client.ui.Anchor;
 import org.gwtbootstrap3.client.ui.CheckBox;
 import org.gwtbootstrap3.client.ui.Form;
@@ -25,16 +28,19 @@ import org.gwtbootstrap3.client.ui.FormLabel;
 import org.gwtbootstrap3.client.ui.Modal;
 import org.gwtbootstrap3.client.ui.ModalFooter;
 import org.gwtbootstrap3.client.ui.TextBox;
+import org.gwtbootstrap3.client.ui.base.form.AbstractForm.SubmitCompleteHandler;
 import org.gwtbootstrap3.client.ui.html.Paragraph;
 
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.dom.client.ClickEvent;
+import com.google.gwt.event.dom.client.ClickHandler;
 import com.google.gwt.event.dom.client.KeyUpEvent;
 import com.google.gwt.event.shared.HandlerRegistration;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.Hidden;
+import com.google.gwt.user.client.ui.HorizontalPanel;
 import com.google.gwt.user.client.ui.Label;
 import com.google.gwt.user.client.ui.ScrollPanel;
 import com.google.gwt.user.client.ui.VerticalPanel;
@@ -42,8 +48,12 @@ import com.google.gwt.user.client.ui.Widget;
 
 public abstract class SnapshotSelectorModal extends Composite {
 
+    private static final String XSRF_TOKEN_REQUEST_FIELD = "xsrfToken";
+
     protected static final Messages MSGS = GWT.create(Messages.class);
     private static SnapshotSelectorModalUiBinder uiBinder = GWT.create(SnapshotSelectorModalUiBinder.class);
+
+    private final GwtSecurityTokenServiceAsync gwtXSRFService = GWT.create(GwtSecurityTokenService.class);
 
     interface SnapshotSelectorModalUiBinder extends UiBinder<Widget, SnapshotSelectorModal> {
     }
@@ -52,6 +62,10 @@ public abstract class SnapshotSelectorModal extends Composite {
     Modal snapshotModal;
     @UiField
     Form snapshotForm;
+    @UiField
+    HorizontalPanel advancedModePanel;
+    @UiField
+    CheckBox advancedModeCheckbox;
     @UiField
     Paragraph snapshotModalDescription;
     @UiField
@@ -67,27 +81,38 @@ public abstract class SnapshotSelectorModal extends Composite {
     @UiField
     Label selectedPidCounter;
     @UiField
+    Paragraph advancedModeHint;
+    @UiField
+    Label advancedModeHintSeparator;
+    @UiField
     ModalFooter snapshotFooter;
 
     HandlerRegistration anchorClickHandler;
+    HandlerRegistration downloadHandler;
+    HandlerRegistration advancedModeClickHandler;
 
     VerticalPanel pidPanel = new VerticalPanel();
+
+    Hidden requestXsrfToken = createRequestParameter(XSRF_TOKEN_REQUEST_FIELD, XSRF_TOKEN_REQUEST_FIELD, "");
 
     protected SnapshotSelectorModal() {
         initWidget(uiBinder.createAndBindUi(this));
         this.noPidSelectedError.setVisible(false);
+        this.advancedModePanel.setVisible(false);
+        this.advancedModeHint.setVisible(false);
+        this.advancedModeHintSeparator.setVisible(false);
     }
 
     /*
      * Use it to customise the modal using the target snapshot
      */
-    protected abstract void customiseModal(Long snapshotId);
+    protected abstract void customiseModal(long snapshotId);
 
     /*
      * Use it to show the modal
      */
 
-    public void showModal(Long snapshotId, List<String> pidList) {
+    public void showModal(long snapshotId, List<String> pidList) {
         customiseModal(snapshotId);
 
         initPidSearch();
@@ -106,9 +131,19 @@ public abstract class SnapshotSelectorModal extends Composite {
     public void hideAndReset() {
         this.snapshotModal.hide();
 
+        this.advancedModePanel.setVisible(false);
+        this.advancedModeHint.setVisible(false);
+
         this.pidSelectionScrollPanel.setVerticalScrollPosition(0);
         this.pidSelectionScrollPanel.setHorizontalScrollPosition(0);
         this.noPidSelectedError.setVisible(false);
+
+        this.advancedModeCheckbox.setValue(false);
+        this.advancedModeHint.setText("");
+        this.advancedModeHint.setVisible(false);
+        this.advancedModeHintSeparator.setVisible(false);
+
+        this.selectOrRemoveAllAnchor.setEnabled(true);
 
         this.snapshotFooter.clear();
     }
@@ -139,6 +174,51 @@ public abstract class SnapshotSelectorModal extends Composite {
         this.snapshotModal.setTitle(title);
         this.snapshotModalDescription.setText(description);
         this.snapshotModalHint.setText(hint);
+    }
+
+    public void setAdvancedModePanel(boolean isVisible) {
+        this.advancedModePanel.setVisible(isVisible);
+    }
+
+    public void setAdvancedModeHintText(String text) {
+        this.advancedModeHint.setText(text);
+    }
+
+    public void setAdvancedModeHintVisibility(boolean isVisible) {
+        this.advancedModeHint.setVisible(isVisible);
+        this.advancedModeHintSeparator.setVisible(isVisible);
+    }
+
+    public void setAdvancedModeClickHandler(ClickHandler clickHandler) {
+        this.advancedModeClickHandler = this.advancedModeCheckbox.addClickHandler(clickHandler);
+    }
+
+    public void setAnchorEnable(boolean isEnabled) {
+        this.selectOrRemoveAllAnchor.setEnabled(isEnabled);
+    }
+
+    public Hidden createRequestParameter(String id, String name, String defaultValue) {
+        Hidden parameter = new Hidden();
+        parameter.setID(id);
+        parameter.setName(name);
+        parameter.setValue(defaultValue);
+        return parameter;
+    }
+
+    public void setErrorVisible(boolean isVisible) {
+        this.noPidSelectedError.setVisible(isVisible);
+    }
+
+    public void submitRequest(List<Hidden> requestParameters) {
+        RequestQueue.submit(context -> this.gwtXSRFService.generateSecurityToken(context.callback(token -> {
+            this.requestXsrfToken.setValue(token.getToken());
+            requestParameters.forEach(parameter -> this.snapshotForm.add(parameter));
+            this.snapshotForm.submit();
+        })));
+    }
+
+    public void addSubmitCompleteHandler(SubmitCompleteHandler completeHandler) {
+        this.downloadHandler = this.snapshotForm.addSubmitCompleteHandler(completeHandler);
     }
 
     /*
@@ -270,7 +350,19 @@ public abstract class SnapshotSelectorModal extends Composite {
         return selectedPidCheckboxes;
     }
 
-    public String getSelectedPidsField(List<CheckBox> selectedCheckboxes) {
+    public List<String> getSelectedPidsList() {
+        List<String> selectedPidsList = new ArrayList<>();
+        this.pidPanel.forEach(widget -> {
+            CheckBox box = (CheckBox) widget;
+            if (box.getValue().booleanValue()) {
+                selectedPidsList.add(box.getName());
+            }
+        });
+
+        return selectedPidsList;
+    }
+
+    public String selectedPidsToRequestParameter(List<CheckBox> selectedCheckboxes) {
         StringBuilder selectedPidsBuilder = new StringBuilder();
 
         selectedCheckboxes.forEach(checkBox -> selectedPidsBuilder.append(checkBox.getText() + ","));
