@@ -13,11 +13,16 @@
  *******************************************************************************/
 package org.eclipse.kura.core.crypto;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
@@ -34,9 +39,11 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
+import javax.crypto.CipherOutputStream;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.spec.GCMParameterSpec;
@@ -108,6 +115,36 @@ public class CryptoServiceImpl implements CryptoService {
             throw new KuraException(KuraErrorCode.ENCODE_ERROR, PARAMETER_EXCEPTION_CAUSE);
         }
 
+    }
+
+    @Override
+    public OutputStream encryptAes(OutputStream stream) throws KuraException {
+        try {
+            Key key = generateKey();
+            Cipher c = Cipher.getInstance(CIPHER);
+            byte[] iv = new byte[IV_SIZE];
+            this.random.nextBytes(iv);
+            c.init(Cipher.ENCRYPT_MODE, key, new GCMParameterSpec(AUTH_TAG_LENGTH_BIT, iv));
+            c.doFinal(stream.toString().getBytes());
+
+            String ivString = base64Encode(iv);
+            String encryptedMessage = base64Encode(stream.toString().getBytes());
+
+            stream.write(ivString.getBytes(StandardCharsets.UTF_8));
+            stream.write("-".getBytes(StandardCharsets.UTF_8));
+            stream.write(encryptedMessage.getBytes(StandardCharsets.UTF_8));
+
+            return new CipherOutputStream(Base64.getEncoder().wrap(stream), c);
+
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+            throw new KuraException(KuraErrorCode.OPERATION_NOT_SUPPORTED, "encrypt");
+        } catch (InvalidKeyException | IllegalBlockSizeException | BadPaddingException | CharacterCodingException e) {
+            throw new KuraException(KuraErrorCode.ENCODE_ERROR, VALUE_EXCEPTION_CAUSE);
+        } catch (InvalidAlgorithmParameterException e) {
+            throw new KuraException(KuraErrorCode.ENCODE_ERROR, PARAMETER_EXCEPTION_CAUSE);
+        } catch (IOException e) {
+            throw new KuraException(KuraErrorCode.IO_ERROR, e);
+        }
     }
 
     private byte[] charArrayToByteArray(char[] value) throws CharacterCodingException {
@@ -189,10 +226,46 @@ public class CryptoServiceImpl implements CryptoService {
             c.init(Cipher.DECRYPT_MODE, generateKey(), new GCMParameterSpec(AUTH_TAG_LENGTH_BIT, iv));
             byte[] decryptedBytes = c.doFinal(decodedValue);
 
+            logger.info("\n\n{}\n\n", new String(decryptedBytes));
+
             return byteArrayToCharArray(decryptedBytes);
         } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
             throw new KuraException(KuraErrorCode.OPERATION_NOT_SUPPORTED, DECRYPT_EXCEPTION_CAUSE);
         } catch (InvalidKeyException | BadPaddingException | IllegalBlockSizeException | CharacterCodingException e) {
+            throw new KuraException(KuraErrorCode.DECODER_ERROR, VALUE_EXCEPTION_CAUSE);
+        } catch (InvalidAlgorithmParameterException e) {
+            throw new KuraException(KuraErrorCode.ENCODE_ERROR, PARAMETER_EXCEPTION_CAUSE);
+        }
+    }
+
+    @Override
+    public InputStream decryptAes(InputStream encryptedValue) throws KuraException {
+        try {
+            String internalStringValue = new BufferedReader(
+                    new InputStreamReader(encryptedValue, StandardCharsets.UTF_8)).lines()
+                            .collect(Collectors.joining("\n"));
+
+            String[] internalStringValueArray = internalStringValue.split(ENCRYPTED_STRING_SEPARATOR);
+            if (internalStringValueArray.length != 2) {
+                throw new KuraException(KuraErrorCode.DECODER_ERROR, VALUE_EXCEPTION_CAUSE);
+            }
+            String encodedIv = internalStringValueArray[0];
+            String encodedValue = internalStringValueArray[1];
+
+            byte[] iv = base64Decode(encodedIv);
+            byte[] decodedValue = base64Decode(encodedValue);
+            if (!internalStringValue.isEmpty() && decodedValue.length == 0) {
+                throw new KuraException(KuraErrorCode.DECODER_ERROR, VALUE_EXCEPTION_CAUSE);
+            }
+
+            Cipher c = Cipher.getInstance(CIPHER);
+            c.init(Cipher.DECRYPT_MODE, generateKey(), new GCMParameterSpec(AUTH_TAG_LENGTH_BIT, iv));
+            byte[] decryptedBytes = c.doFinal(decodedValue);
+
+            return new ByteArrayInputStream(decryptedBytes);
+        } catch (NoSuchAlgorithmException | NoSuchPaddingException e) {
+            throw new KuraException(KuraErrorCode.OPERATION_NOT_SUPPORTED, DECRYPT_EXCEPTION_CAUSE);
+        } catch (InvalidKeyException | BadPaddingException | IllegalBlockSizeException e) {
             throw new KuraException(KuraErrorCode.DECODER_ERROR, VALUE_EXCEPTION_CAUSE);
         } catch (InvalidAlgorithmParameterException e) {
             throw new KuraException(KuraErrorCode.ENCODE_ERROR, PARAMETER_EXCEPTION_CAUSE);
