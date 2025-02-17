@@ -118,12 +118,14 @@ public class DTOUtil {
             final Object result;
 
             if (property instanceof Password) {
-                result = new Password(cryptoService.decryptAes(((Password) property).getPassword()));
+                // result = new Password(cryptoService.decryptAes(((Password) property).getPassword()));
+                result = new Password(cryptoService.decryptAes((((Password) property).getPasswordStream())));
             } else if (property instanceof Password[]) {
                 final Password[] asPasswords = (Password[]) property;
                 final Password[] resultPasswords = new Password[asPasswords.length];
 
                 for (int i = 0; i < asPasswords.length; i++) {
+                    // resultPasswords[i] = new Password(cryptoService.decryptAes(asPasswords[i].getPassword()));
                     resultPasswords[i] = new Password(cryptoService.decryptAes(asPasswords[i].getPassword()));
                 }
 

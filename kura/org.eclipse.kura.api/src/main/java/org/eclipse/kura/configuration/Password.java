@@ -12,6 +12,13 @@
  ******************************************************************************/
 package org.eclipse.kura.configuration;
 
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.stream.Collectors;
+
 import org.osgi.annotation.versioning.ProviderType;
 
 /**
@@ -21,21 +28,35 @@ import org.osgi.annotation.versioning.ProviderType;
 public class Password {
 
     private char[] passwordVal;
+    private InputStream passwordValStream;
 
     public Password(String password) {
         super();
         if (password != null) {
             this.passwordVal = password.toCharArray();
+            this.passwordValStream = new ByteArrayInputStream(password.getBytes());
         }
     }
 
     public Password(char[] password) {
         super();
         this.passwordVal = password;
+        this.passwordValStream = new ByteArrayInputStream(new String(password).getBytes());
+    }
+
+    public Password(InputStream password) {
+        super();
+        this.passwordValStream = password;
+        this.passwordVal = new BufferedReader(new InputStreamReader(password, StandardCharsets.UTF_8)).lines()
+                .collect(Collectors.joining("\n")).toCharArray();
     }
 
     public char[] getPassword() {
         return this.passwordVal;
+    }
+
+    public InputStream getPasswordStream() {
+        return this.passwordValStream;
     }
 
     @Override

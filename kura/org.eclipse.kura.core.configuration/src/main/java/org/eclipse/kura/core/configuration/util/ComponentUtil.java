@@ -13,6 +13,7 @@
  *******************************************************************************/
 package org.eclipse.kura.core.configuration.util;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -547,7 +548,12 @@ public class ComponentUtil {
 
     private static Password encryptPassword(Password password, final CryptoService cryptoService) throws KuraException {
         if (!isEncrypted(password, cryptoService)) {
-            return new Password(cryptoService.encryptAes(password.getPassword()));
+            try (ByteArrayOutputStream stream = new ByteArrayOutputStream()) {
+                stream.write(new String(password.getPassword()).getBytes());
+                return new Password(cryptoService.encryptAes(stream).toString());
+            } catch (IOException ex) {
+                throw new KuraException(KuraErrorCode.IO_ERROR, ex);
+            }
         }
         return password;
     }

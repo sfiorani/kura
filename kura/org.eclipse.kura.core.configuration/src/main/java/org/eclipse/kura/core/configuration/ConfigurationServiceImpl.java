@@ -715,7 +715,7 @@ public class ConfigurationServiceImpl implements ConfigurationService, OCDServic
     }
 
     private Password decryptPassword(Password encryptedPassword) throws KuraException {
-        return new Password(this.cryptoService.decryptAes(encryptedPassword.getPassword()));
+        return new Password(this.cryptoService.decryptAes(encryptedPassword.getPasswordStream()));
     }
 
     // ----------------------------------------------------------------
